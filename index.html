@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>Prompter</title>
+  <!-- item 9, the install minimum: a manifest and standalone display, no service worker yet, so a reload always brings the newest build while the app changes daily (158 brings the worker, with its never-mid-session rule) -->
+  <link rel="manifest" href="./app.webmanifest">
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Prompter">
+  <link rel="apple-touch-icon" href="./app-icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap">
+  <script type="module" crossorigin src="./assets/index-IdzkYGhb.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CkZHSmWw.css">
+</head>
+<body>
+  <div id="screens" class="screens" hidden></div>
+  <div id="roomHost" class="room-host" hidden></div>
+  <main id="stage" class="stage" aria-label="Prompter" hidden>
+    <div id="column" class="column"></div>
+    <div id="maskTop" class="mask mask-top" aria-hidden="true"></div>
+    <div id="maskBottom" class="mask mask-bottom" aria-hidden="true"></div>
+    <div id="readLine" class="readline" aria-hidden="true"></div>
+  </main>
+  <aside id="hud" class="hud" aria-live="off" hidden></aside>
+  <div id="installBar" class="installbar" hidden>
+    <span id="installText">Install this app for a full-screen prompter with no browser bars.</span>
+    <button id="installBtn" class="btn btn-accent" type="button">Install</button>
+    <a id="installOpen" class="btn btn-accent" href="./" target="_blank" rel="noopener" hidden>Open app</a>
+    <button id="installLater" class="btn btn-quiet" type="button">Not now</button>
+  </div>
+  <div id="talkWrap" class="talkwrap" hidden>
+    <video id="talk" class="talkvideo" autoplay playsinline muted></video>
+    <p class="talkhint" id="talkHint">Tap to return to the script</p>
+  </div>
+  <div id="camIndicator" class="cam-indicator" hidden>CAMERA ON</div>
+  <video id="cam" class="cam" autoplay playsinline muted hidden></video>
+  <audio id="far" autoplay></audio>
+  <button id="unmute" class="soundbar soundbar-blocked" type="button" hidden>THE SOUND IS OFF. Tap here to hear the other end.</button>
+  <button id="mutedBanner" class="soundbar soundbar-muted" type="button" hidden></button>
+  <div id="linkBox" class="linkbox" hidden>
+    <input id="linkField" class="linkfield" type="text" readonly aria-label="Session link">
+    <button id="copyLink" class="copybtn" type="button">Copy link</button>
+  </div>
+  <button id="copyReport" class="copybtn reportbtn" type="button" hidden>Copy report</button>
+  <button id="audioBtn" class="copybtn audiobtn" type="button" hidden>Audio</button>
+  <button id="leaveBtn" class="copybtn leavebtn" type="button" hidden>Leave</button>
+  <button id="fsBtn" class="copybtn fsbtn" type="button" hidden>Full screen</button>
+  <p id="fsHint" class="fshint" hidden>Click the text to go full screen. Esc brings the window back.</p>
+  <div id="audioPanel" class="audiopanel" hidden>
+    <div class="audiopanel-row">
+      <span class="control-label">Listening on</span>
+      <div class="segment" id="earSeg">
+        <button class="seg on" type="button" data-ear="0">Speaker</button>
+        <button class="seg" type="button" data-ear="1">Earpiece in</button>
+      </div>
+    </div>
+    <div class="audiopanel-row">
+      <span class="control-label">Mute</span>
+      <div class="segment" id="muteSeg">
+        <button class="seg" type="button" data-mute="mic">Microphone</button>
+        <button class="seg" type="button" data-mute="speaker">Speaker</button>
+      </div>
+    </div>
+    <label class="audiopanel-row"><span class="control-label">Microphone</span><select id="micSelect" class="field select" aria-label="Microphone"></select></label>
+    <label class="audiopanel-row" id="camRow"><span class="control-label">Camera</span><select id="camSelect" class="field select" aria-label="Camera"></select></label>
+    <p class="note" id="audioNote"></p>
+  </div>
+</body>
+</html>
