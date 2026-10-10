@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>Prompter</title>
+  <!-- item 9, the install minimum: a manifest and standalone display, no service worker yet, so a reload always brings the newest build while the app changes daily (158 brings the worker, with its never-mid-session rule) -->
+  <link rel="manifest" href="./app.webmanifest">
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Prompter">
+  <!-- 146: the scheme the operator chose, applied before the first paint, with the page's ground following it in the stylesheet (verifier run 30, low 14); src/scheme.ts is the rule, this is its first application -->
+  <script>try{var s=localStorage.getItem('ui.scheme');document.documentElement.dataset.scheme=s==='light'||(s==='system'&&!matchMedia('(prefers-color-scheme: dark)').matches)?'light':'dark';var m=document.querySelector('meta[name=theme-color]');if(m)m.content=document.documentElement.dataset.scheme==='light'?'#e9e6df':'#14191d'}catch(e){document.documentElement.dataset.scheme='dark'}</script>
+  <link rel="apple-touch-icon" href="./app-icon-192.png">
+  <!-- 162: Rob's ratified artwork (10 Oct 2026, Assets/): the disc for the tab and the taskbar; the name is not in it, so it ships before D6 -->
+  <link rel="icon" type="image/png" sizes="32x32" href="./app-icon-32.png">
+  <link rel="icon" type="image/png" sizes="48x48" href="./app-icon-48.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap">
+  <script type="module" crossorigin src="./assets/index-DJISIifv.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-6uKu_FVO.css">
+</head>
+<body>
+  <div id="screens" class="screens" hidden></div>
+  <div id="roomHost" class="room-host" hidden></div>
+  <main id="stage" class="stage" aria-label="Prompter" hidden>
+    <div id="column" class="column"></div>
+    <div id="maskTop" class="mask mask-top" aria-hidden="true"></div>
+    <div id="maskBottom" class="mask mask-bottom" aria-hidden="true"></div>
+    <div id="readLine" class="readline" aria-hidden="true"></div>
+    <div id="tapeBeat" class="tape-beat" aria-hidden="true" hidden></div>
+    <div id="tapeCard" class="tape-card" role="status" hidden><span class="tape-card-word"></span><span class="tape-card-words"></span></div>
+  </main>
+  <aside id="hud" class="hud" aria-live="off" hidden></aside>
+  <div id="installBar" class="installbar" hidden>
+    <span id="installText">Install this app for a full-screen prompter with no browser bars.</span>
+    <button id="installBtn" class="btn btn-accent" type="button">Install</button>
+    <a id="installOpen" class="btn btn-accent" href="./" target="_blank" rel="noopener" hidden>Open app</a>
+    <button id="installLater" class="btn btn-quiet" type="button">Not now</button>
+  </div>
+  <div id="talkWrap" class="talkwrap" hidden>
+    <video id="talk" class="talkvideo" autoplay playsinline muted></video>
+    <p class="talkhint" id="talkHint">Tap to return to the script</p>
+  </div>
+  <div id="camIndicator" class="cam-indicator" role="status" aria-label="Your camera is on" title="Your camera is on." hidden></div>
+  <div id="camWin" class="cam-win" role="dialog" aria-label="Performer camera" hidden>
+    <div id="camBar" class="cam-bar">
+      <span class="cam-title">Performer</span>
+      <button id="camTop" class="cam-btn" type="button" title="Keep this window over every other application." hidden>On top</button>
+      <button id="camFull" class="cam-btn" type="button" title="The whole screen, for a conversation between takes. Esc leaves it.">Full screen</button>
+      <button id="camReset" class="cam-btn" type="button" title="Back into the column, at the top of the right rail.">Reset</button>
+      <button id="camMin" class="cam-btn" type="button" title="Minimise to the bar." aria-label="Minimise">–</button>
+    </div>
+    <div id="camPic" class="cam-pic"><video id="cam" class="cam" autoplay playsinline muted></video></div>
+    <label class="control cam-keep" title="The window stays undocked between sessions: next time it arrives floating, where you left it and at this size."><input id="camKeep" type="checkbox"> Keep undocked</label>
+    <div class="cam-h cam-h-n" data-edge="n"></div><div class="cam-h cam-h-s" data-edge="s"></div><div class="cam-h cam-h-e" data-edge="e"></div><div class="cam-h cam-h-w" data-edge="w"></div><div class="cam-h cam-h-ne" data-edge="ne"></div><div class="cam-h cam-h-nw" data-edge="nw"></div><div class="cam-h cam-h-se" data-edge="se"></div><div class="cam-h cam-h-sw" data-edge="sw"></div>
+  </div>
+  <audio id="far" autoplay></audio>
+  <button id="unmute" class="soundbar soundbar-blocked" type="button" hidden>THE SOUND IS OFF. Tap here to hear the other end.</button>
+  <button id="mutedBanner" class="soundbar soundbar-muted" type="button" hidden></button>
+  <div id="linkBox" class="linkbox" hidden>
+    <input id="linkField" class="linkfield" type="text" readonly aria-label="Session link">
+    <button id="copyLink" class="copybtn" type="button">Copy link</button>
+  </div>
+  <button id="copyReport" class="copybtn reportbtn" type="button" hidden>Copy report</button>
+  <button id="audioBtn" class="copybtn audiobtn" type="button" hidden>Audio</button>
+  <button id="leaveBtn" class="copybtn leavebtn" type="button" hidden>Leave</button>
+  <button id="fsBtn" class="copybtn fsbtn" type="button" hidden>Full screen</button>
+  <p id="fsHint" class="fshint" hidden>Click the text to go full screen. Esc brings the window back.</p>
+  <div id="audioPanel" class="audiopanel" hidden>
+    <div class="audiopanel-row">
+      <span class="control-label">Listening on</span>
+      <div class="segment" id="earSeg">
+        <button class="seg on" type="button" data-ear="0">Speaker</button>
+        <button class="seg" type="button" data-ear="1">Earpiece in</button>
+      </div>
+    </div>
+    <div class="audiopanel-row">
+      <span class="control-label">Mute</span>
+      <div class="segment" id="muteSeg">
+        <button class="seg" type="button" data-mute="mic">Microphone</button>
+        <button class="seg" type="button" data-mute="speaker">Speaker</button>
+      </div>
+    </div>
+    <label class="audiopanel-row"><span class="control-head"><span class="control-label">Far voice</span><span class="fig" id="farLevelFig">100%</span></span><input id="farLevel" class="range" type="range" min="100" max="300" step="5" value="100" aria-label="Far voice level"><span class="note">At 100% it comes as it is. Above that the app adds to it, which can distort if the other end is already loud.</span></label>
+    <label class="audiopanel-row"><span class="control-label">Microphone</span><select id="micSelect" class="field select" aria-label="Microphone"></select></label>
+    <label class="audiopanel-row" id="camRow"><span class="control-label">Camera</span><select id="camSelect" class="field select" aria-label="Camera"></select></label>
+    <p class="note" id="audioNote"></p>
+  </div>
+</body>
+</html>
