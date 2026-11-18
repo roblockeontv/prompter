@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#000000">
+<title>Controls probe</title>
+<!--
+  An instrument, not a product surface: it shows exactly what this browser receives from a controller, a keyboard,
+  a clicker, a pedal or a mouse, so that the controller model is designed from what arrives and not from what is
+  assumed. Plain HTML and script, shipped as it is. Nothing leaves the device; Copy report puts text on the clipboard.
+-->
+<style>
+  :root { --bg:#14191d; --panel:#171d22; --line:#2a3238; --text:#f2efe6; --muted:#8a99a3; --accent:#e8a33d; --good:#5fb08c; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.45 -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding:18px 16px 40px; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  p.lede { color:var(--muted); margin:0 0 16px; max-width:64ch; }
+  section { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px; margin:0 0 14px; }
+  h2 { font:600 12px/1 ui-monospace, Consolas, monospace; letter-spacing:.12em; color:var(--muted); margin:0 0 10px; text-transform:uppercase; }
+  .pad { border-top:1px solid var(--line); padding-top:10px; margin-top:10px; }
+  .pad:first-of-type { border-top:0; padding-top:0; margin-top:0; }
+  .id { font:13px/1.3 ui-monospace, Consolas, monospace; word-break:break-all; }
+  .axis { display:grid; grid-template-columns:64px 1fr 150px; gap:8px; align-items:center; font:12px/1 ui-monospace, Consolas, monospace; margin:6px 0; }
+  .bar { height:10px; background:#2b333a; border-radius:5px; position:relative; }
+  .bar i { position:absolute; top:-3px; width:4px; height:16px; background:var(--accent); border-radius:2px; margin-left:-2px; }
+  .bar b { position:absolute; left:50%; top:0; bottom:0; width:1px; background:#55616a; }
+  .btns { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .btn { min-width:34px; padding:6px 8px; border-radius:7px; border:1px solid var(--line); font:12px/1 ui-monospace, Consolas, monospace; text-align:center; color:var(--muted); }
+  .btn.on { background:rgba(232,163,61,.25); border-color:var(--accent); color:var(--text); }
+  pre { margin:0; font:12px/1.5 ui-monospace, Consolas, monospace; white-space:pre-wrap; word-break:break-word; max-height:260px; overflow:auto; color:var(--text); }
+  .row { display:flex; gap:10px; flex-wrap:wrap; }
+  button { padding:11px 16px; border-radius:9px; border:0; background:var(--accent); color:#14191d; font:700 14px/1 inherit; }
+  button.quiet { background:#232a30; color:var(--text); }
+  .note { color:var(--muted); font-size:13px; margin:8px 0 0; }
+  #zone { border:1px dashed var(--line); border-radius:8px; padding:22px 12px; text-align:center; color:var(--muted); touch-action:none; user-select:none; -webkit-user-select:none; }
+</style>
+</head>
+<body>
+<h1>Controls probe</h1>
+<p class="lede">Pair or plug in the controller, then press a button on it once so the browser can see it. Move every stick, wheel and pedal through its whole travel and press every button. Then Copy report and paste it.</p>
+<p class="lede"><b>For a stick or wheel that varies the speed:</b> press Clear, hold it just off its rest for five seconds, let go; then hold it at full travel for five seconds, let go; then Copy report. The gaps between presses will show whether the travel is carried in how fast it repeats.</p>
+
+<section>
+  <h2>Game controllers</h2>
+  <div id="pads"><p class="note">None seen yet. A browser only reveals a controller after a button on it has been pressed while this page is in front.</p></div>
+</section>
+
+<section>
+  <h2>Keys (keyboards, clickers, pedals and remotes that present as keyboards)</h2>
+  <pre id="keys">none yet</pre>
+</section>
+
+<section>
+  <h2>Mouse, wheel and touch</h2>
+  <div id="zone">Scroll the wheel, hold each mouse button, or drag here</div>
+  <pre id="ptr" style="margin-top:10px">none yet</pre>
+</section>
+
+<section>
+  <div class="row"><button id="copy" type="button">Copy report</button><button id="reset" class="quiet" type="button">Clear</button></div>
+  <p class="note" id="copied"></p>
+</section>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const pads = new Map(); // index -> { id, mapping, axes:[{min,max,rest}], buttons:Set, analogueButtons:Set }
+  const keys = new Map(); // code -> { key, code, keyCode, count, repeats, location }
+  const ptr = { wheel: new Map(), buttons: new Set(), types: new Set(), wheelEvents: 0, minDelta: Infinity, maxDelta: 0 };
+  let supported = typeof navigator.getGamepads === 'function';
+
+  const fmt = (n) => (n >= 0 ? ' ' : '') + n.toFixed(3);
+
+  function pollPads() {
+    if (supported) {
+      const list = navigator.getGamepads();
+      const host = $('pads');
+      let html = '';
+      for (const g of list) {
+        if (!g) continue;
+        let rec = pads.get(g.index);
+        if (!rec) { rec = { id: g.id, mapping: g.mapping || '(none)', axes: [], buttons: new Set(), analogue: new Set(), nButtons: g.buttons.length }; pads.set(g.index, rec); }
+        html += '<div class="pad"><div class="id">#' + g.index + ' ' + g.id.replace(/</g, '&lt;') + '</div><div class="note">mapping: ' + rec.mapping + ' · ' + g.axes.length + ' axes · ' + g.buttons.length + ' buttons</div>';
+        g.axes.forEach((v, i) => {
+          // rest is where the axis last sat STILL for a second, not its first reading: a pad only appears once a button is
+          // pressed, and a thumb is often on a stick by then (Rob's controller reported a rest of 0.514, 19 Sep 2026)
+          const a = rec.axes[i] || (rec.axes[i] = { min: v, max: v, stills: new Map(), still: v, since: performance.now() });
+          a.min = Math.min(a.min, v); a.max = Math.max(a.max, v);
+          if (Math.abs(v - a.still) > 0.02) { a.still = v; a.since = performance.now(); }
+          else if (performance.now() - a.since > 1000) { const k = (Math.round(a.still * 20) / 20).toFixed(2); a.stills.set(k, Math.max(a.stills.get(k) || 0, (performance.now() - a.since) / 1000)); }
+          html += '<div class="axis"><span>axis ' + i + '</span><div class="bar"><b></b><i style="left:' + ((v + 1) * 50) + '%"></i></div><span>' + fmt(v) + '  [' + fmt(a.min) + ',' + fmt(a.max) + ']</span></div>';
+        });
+        html += '<div class="btns">';
+        g.buttons.forEach((b, i) => {
+          if (b.pressed) rec.buttons.add(i);
+          if (b.value > 0.02 && b.value < 0.98) rec.analogue.add(i);
+          html += '<span class="btn' + (b.pressed ? ' on' : '') + '">' + i + (b.value > 0 && b.value < 1 ? ' ' + b.value.toFixed(2) : '') + '</span>';
+        });
+        html += '</div></div>';
+      }
+      if (html) host.innerHTML = html;
+    }
+    requestAnimationFrame(pollPads);
+  }
+  if (!supported) $('pads').innerHTML = '<p class="note">This browser does not offer the Gamepad interface at all.</p>';
+  window.addEventListener('gamepadconnected', () => undefined);
+  requestAnimationFrame(pollPads);
+
+  // Timing matters as much as identity: a stick that presents as a key may still carry its travel in HOW FAST it
+  // repeats, so every press is timed. gaps = milliseconds between successive presses of the same key; holds = how
+  // long each press lasted, where the browser reports a release at all.
+  const stats = (a) => {
+    if (!a.length) return 'none';
+    const s = [...a].sort((x, y) => x - y);
+    return 'min ' + Math.round(s[0]) + ' / median ' + Math.round(s[Math.floor(s.length / 2)]) + ' / max ' + Math.round(s[s.length - 1]) + ' ms (n=' + s.length + ')';
+  };
+  const keyLine = (k) => 'key "' + k.key + '"  code ' + k.code + '  keyCode ' + k.keyCode + '  x' + k.count + (k.repeats ? '  (auto-repeat seen)' : '') +
+    '\n    gaps between presses: ' + stats(k.gaps) + '\n    last ten gaps: ' + (k.gaps.slice(-10).map((g) => Math.round(g)).join(', ') || 'none') +
+    '\n    releases seen: ' + k.ups + '; hold lengths: ' + stats(k.holds);
+  function showKeys() {
+    const lines = [...keys.values()].map(keyLine);
+    $('keys').textContent = lines.length ? lines.join('\n') : 'none yet';
+  }
+  const recOf = (e) => {
+    const id = e.code || ('key:' + e.key);
+    let k = keys.get(id);
+    if (!k) { k = { key: e.key, code: e.code || '(empty)', keyCode: e.keyCode, count: 0, repeats: false, gaps: [], holds: [], ups: 0, lastDown: null, downAt: null }; keys.set(id, k); }
+    return k;
+  };
+  window.addEventListener('keydown', (e) => {
+    const k = recOf(e); const t = performance.now();
+    k.count += 1; if (e.repeat) k.repeats = true;
+    if (k.lastDown !== null && k.gaps.length < 400) k.gaps.push(t - k.lastDown);
+    k.lastDown = t; if (k.downAt === null) k.downAt = t;
+    showKeys();
+    if (['Space', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(e.code)) e.preventDefault();
+  });
+  window.addEventListener('keyup', (e) => {
+    const k = recOf(e); const t = performance.now();
+    k.ups += 1; if (k.downAt !== null && k.holds.length < 400) k.holds.push(t - k.downAt);
+    k.downAt = null; showKeys();
+  });
+
+  function showPtr() {
+    const w = [...ptr.wheel.entries()].map(([mode, n]) => 'wheel deltaMode ' + mode + ' (' + ['pixels', 'lines', 'pages'][mode] + ') x' + n);
+    const lines = [];
+    if (ptr.wheelEvents) lines.push(w.join('; ') + '; |deltaY| from ' + ptr.minDelta.toFixed(1) + ' to ' + ptr.maxDelta.toFixed(1));
+    if (ptr.buttons.size) lines.push('pointer buttons seen: ' + [...ptr.buttons].sort().join(', ') + '  (0 left, 1 middle, 2 right, 3 back, 4 forward)');
+    if (ptr.types.size) lines.push('pointer types: ' + [...ptr.types].join(', '));
+    $('ptr').textContent = lines.length ? lines.join('\n') : 'none yet';
+  }
+  const zone = $('zone');
+  zone.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    ptr.wheelEvents += 1; ptr.wheel.set(e.deltaMode, (ptr.wheel.get(e.deltaMode) || 0) + 1);
+    const d = Math.abs(e.deltaY); if (d > 0) { ptr.minDelta = Math.min(ptr.minDelta, d); ptr.maxDelta = Math.max(ptr.maxDelta, d); }
+    showPtr();
+  }, { passive: false });
+  zone.addEventListener('pointerdown', (e) => { ptr.buttons.add(e.button); ptr.types.add(e.pointerType); showPtr(); });
+  zone.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  function report() {
+    const out = [];
+    out.push('controls probe · ' + new Date().toISOString());
+    out.push('agent ' + navigator.userAgent);
+    out.push('installed app: ' + (matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches ? 'yes' : 'no (a browser tab)'));
+    out.push('gamepad interface: ' + (supported ? 'present' : 'ABSENT'));
+    if (!pads.size) out.push('game controllers seen: none');
+    for (const [i, r] of pads) {
+      out.push('controller #' + i + ': ' + r.id);
+      out.push('  mapping ' + r.mapping + '; ' + r.axes.length + ' axes; ' + r.nButtons + ' buttons');
+      r.axes.forEach((a, n) => out.push('  axis ' + n + ': sat still at ' + (a.stills.size === 0 ? 'nowhere' : [...a.stills].sort((x, y) => y[1] - x[1]).slice(0, 4).map(([k, s]) => k + ' (' + s.toFixed(0) + ' s)').join(', ')) + '; travelled ' + fmt(a.min) + ' to ' + fmt(a.max) + (a.max - a.min < 0.05 ? '  (did not move)' : '')));
+      out.push('  buttons pressed: ' + ([...r.buttons].sort((x, y) => x - y).join(', ') || 'none'));
+      out.push('  buttons with an analogue value (triggers): ' + ([...r.analogue].sort((x, y) => x - y).join(', ') || 'none'));
+    }
+    out.push('keys: ' + (keys.size ? '' : 'none'));
+    for (const k of keys.values()) out.push('  ' + keyLine(k));
+    out.push('pointer: ' + $('ptr').textContent.replace(/\n/g, ' | '));
+    return out.join('\n');
+  }
+  $('copy').addEventListener('click', async () => {
+    const text = report();
+    try { await navigator.clipboard.writeText(text); $('copied').textContent = 'Copied. Paste it into the chat.'; }
+    catch { $('copied').textContent = 'Could not reach the clipboard; select and copy this instead:'; const pre = document.createElement('pre'); pre.textContent = text; $('copied').after(pre); }
+  });
+  $('reset').addEventListener('click', () => { pads.clear(); keys.clear(); ptr.wheel.clear(); ptr.buttons.clear(); ptr.types.clear(); ptr.wheelEvents = 0; ptr.minDelta = Infinity; ptr.maxDelta = 0; showKeys(); showPtr(); $('copied').textContent = ''; });
+})();
+</script>
+</body>
+</html>
